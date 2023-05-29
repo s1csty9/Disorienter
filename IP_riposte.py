@@ -1,7 +1,7 @@
 import random
 import socket
 import struct
-from mitmproxy import http, ctx
+from mitmproxy import http, ctx, master
 import requests
 
 def get_public_ip():
@@ -13,18 +13,38 @@ def get_public_ip():
         return None
 
 public_ip = get_public_ip()
-while 1 == 1:
-  class RequestInterceptor:
-      def request(self, flow: http.HTTPFlow) -> None:
-          if "discord.com/api/webhooks" in flow.request.pretty_host:
-              if public_ip and public_ip in flow.request.text:
-                  random_ip = self.generate_random_ip()
-                  modified_body = flow.request.text.replace(public_ip, random_ip)
-                  flow.request.text = modified_body
 
-      def generate_random_ip(self):
-          return socket.inet_ntoa(struct.pack('>I', random.randint(1, 0xffffffff)))
+class RequestInterceptor:
+    def __init__(self):
+        self.random_ip = None
 
-  addons = [
-      RequestInterceptor()
-  ]
+    def request(self, flow: http.HTTPFlow) -> None:
+        if "discord.com/api/webhooks" in flow.request.pretty_host:
+            if public_ip and public_ip in flow.request.text:
+                self.random_ip = self.generate_random_ip()
+                modified_body = flow.request.text.replace(public_ip, self.random_ip)
+                flow.request.text = modified_body
+
+    def response(self, flow: http.HTTPFlow) -> None:
+        if self.random_ip and self.random_ip in flow.response.text:
+            modified_body = flow.response.text.replace(self.random_ip, public_ip)
+            flow.response.text = modified_body
+
+    def generate_random_ip(self):
+        return socket.inet_ntoa(struct.pack('>I', random.randint(1, 0xffffffff)))
+
+addons = [
+    RequestInterceptor()
+]
+
+def start():
+    config = ctx.default_config
+    config.options.update(
+        ssl_insecure=True
+    )
+    m = master.Master(options=config)
+    m.addons.add(addons)
+    m.run()
+
+if __name__ == "__main__":
+    start()
