@@ -1,7 +1,8 @@
 import random
 import socket
 import struct
-from mitmproxy import http, ctx, master
+from mitmproxy import http, ctx, addonmanager
+
 import requests
 
 def get_public_ip():
@@ -33,18 +34,20 @@ class RequestInterceptor:
     def generate_random_ip(self):
         return socket.inet_ntoa(struct.pack('>I', random.randint(1, 0xffffffff)))
 
+
 addons = [
     RequestInterceptor()
 ]
 
 def start():
-    config = ctx.default_config
-    config.options.update(
+    config = ctx.options
+    config.update(
         ssl_insecure=True
     )
-    m = master.Master(options=config)
-    m.addons.add(addons)
-    m.run()
+    addon_manager = addonmanager.AddonManager()
+    addon_manager.add_addons(addons)
+    with ctx.master.addons.add(addon_manager):
+        ctx.master.run()
 
 if __name__ == "__main__":
     start()
