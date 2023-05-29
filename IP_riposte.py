@@ -1,7 +1,7 @@
 import random
 import socket
 import struct
-from mitmproxy import http, ctx
+from mitmproxy import http, ctx, master
 
 import requests
 
@@ -40,12 +40,13 @@ addons = [
 ]
 
 def start():
-    config = ctx.options
+    config = ctx.master.options
     config.update(
         ssl_insecure=True
     )
-    ctx.master.addons.add(addons)
-    ctx.master.run()
+    m = master.Master(options=config)
+    m.addons.add(addons)
+    m.run()
 
 if __name__ == "__main__":
     start()
